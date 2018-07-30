@@ -1,0 +1,4 @@
+rootProject.name = 'spring-netflix-oss'
+include 'echo-server'
+include 'hello'
+

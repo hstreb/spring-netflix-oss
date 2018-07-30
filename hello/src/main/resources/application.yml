@@ -1,0 +1,19 @@
+server:
+  port: 8081
+echo-server:
+  ribbon:
+    ReadTimeout: 10000
+    ConnectTimeout: 1000
+    MaxAutoRetries: 1
+    MaxAutoRetriesNextServer: 0
+    listOfServers: localhost:8080
+feign:
+  hystrix:
+    enabled: true
+hystrix:
+  command:
+    default:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 21000
