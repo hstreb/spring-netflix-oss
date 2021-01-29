@@ -16,16 +16,24 @@ O `duration` deve ser maior que a metade e menor que o total do timeout, assim h
 ./gradlew build
 ```
 
+### rodar jaeger
+
+```
+docker run -d --name jaeger \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  -p 14250:14250 \
+  jaegertracing/all-in-one:1.21
+```
+
 ### rodar em 2 terminais diferentes:
 
 ```
-java -jar hello/build/libs/hello-1.0.0.jar
-
+java -javaagent:opentelemetry-javaagent-all.jar -Dotel.exporter=jaeger -Dotel.exporter.jaeger.service.name=hello -jar hello/build/libs/hello-1.0.0.jar
 ```
 
 ```
-java -jar echo-server/build/libs/echo-server-1.0.0.jar
-
+java -javaagent:opentelemetry-javaagent-all.jar -Dotel.exporter=jaeger -Dotel.exporter.jaeger.service.name=echo-server -jar echo-server/build/libs/echo-server-1.0.0.jar
 ```
 
 ### exemplo de chamadas usando https://httpie.org/:
@@ -114,6 +122,8 @@ Log do echo-server:
 [2]: {0=1, 1=2, 2=2}
 [2]: Waiting for 10200 ms
 ```
+
+Verificar o Jaeger para ver os traces em http://localhost:16686/.
 
 ### configuração
 
