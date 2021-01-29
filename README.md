@@ -12,7 +12,7 @@ O `duration` deve ser maior que a metade e menor que o total do timeout, assim h
 
 ### build
 
-```
+```sh
 ./gradlew build
 ```
 
