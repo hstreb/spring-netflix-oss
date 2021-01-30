@@ -25,6 +25,11 @@ docker run -d --name jaeger \
   -p 14250:14250 \
   jaegertracing/all-in-one:1.21
 ```
+### baixar opentelemetry agent
+
+```
+wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent-all.jar
+```
 
 ### rodar em 2 terminais diferentes:
 
