@@ -16,140 +16,90 @@ O `duration` deve ser maior que a metade e menor que o total do timeout, assim h
 ./gradlew build
 ```
 
-### rodar jaeger
-
-```
-docker run -d --name jaeger \
-  -p 16686:16686 \
-  -p 14268:14268 \
-  -p 14250:14250 \
-  jaegertracing/all-in-one:1.21
-```
 ### baixar opentelemetry agent
 
 ```
 wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent-all.jar
 ```
 
-### rodar em 2 terminais diferentes:
+### baixar opentelemetry agent
 
 ```
-java -javaagent:opentelemetry-javaagent-all.jar -Dotel.exporter=jaeger -Dotel.exporter.jaeger.service.name=hello -jar hello/build/libs/hello-1.0.0.jar
+wget https://repo1.maven.org/maven2/co/elastic/apm/elastic-apm-agent/1.21.0/elastic-apm-agent-1.21.0.jar
+```
+
+### rodar com agente opentelemetry enviando para ELK APM
+
+```
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=hello,deployment.environment=production \
+  -jar hello/build/libs/hello-1.0.0.jar
 ```
 
 ```
-java -javaagent:opentelemetry-javaagent-all.jar -Dotel.exporter=jaeger -Dotel.exporter.jaeger.service.name=echo-server -jar echo-server/build/libs/echo-server-1.0.0.jar
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=echo-server,deployment.environment=production \
+  -jar echo-server/build/libs/echo-server-1.0.0.jar
 ```
 
-### exemplo de chamadas usando https://httpie.org/:
-
-Sem retry:
+### rodar com agente ELK APM
 
 ```
-$ time http :8081/hello id==0 duration==5100 retries==0
-HTTP/1.1 200
-Content-Type: application/json;charset=UTF-8
-Date: Mon, 30 Jul 2018 19:48:05 GMT
-Transfer-Encoding: chunked
-
-{
-    "calls": 1,
-    "id": 0
-}
-
-
-real	0m5.573s
-user	0m0.201s
-sys	0m0.028s
+java -javaagent:./elastic-apm-agent-1.21.0.jar \
+     -Delastic.apm.service_name=hello \
+     -Delastic.apm.server_urls=http://localhost:8200 \
+     -Delastic.apm.secret_token= \
+     -Delastic.apm.environment=production \
+     -Delastic.apm.enable_log_correlation=true \
+     -Delastic.apm.application_packages=org.example \
+     -jar hello/build/libs/hello-1.0.0.jar
 ```
 
-Com 1 retry:
-
 ```
-$ time http :8081/hello id==1 duration==5100 retries==1
-HTTP/1.1 200
-Content-Type: application/json;charset=UTF-8
-Date: Mon, 30 Jul 2018 19:42:12 GMT
-Transfer-Encoding: chunked
-
-{
-    "calls": 2,
-    "id": 1
-}
-
-
-real	0m15.443s
-user	0m0.200s
-sys	0m0.029s
+java -javaagent:./elastic-apm-agent-1.21.0.jar \
+   -Delastic.apm.service_name=echo-server \
+   -Delastic.apm.server_urls=http://localhost:8200 \
+   -Delastic.apm.secret_token= \
+   -Delastic.apm.environment=production \
+   -Delastic.apm.enable_log_correlation=true \
+   -Delastic.apm.application_packages=org.example \
+   -jar echo-server/build/libs/echo-server-1.0.0.jar
 ```
 
-Com tentativa de 2 retries, mas estoura o timeout:
+### rodar testes usando https://httpie.org/:
+
+Para cada configuração acima rodar a bateria de testes abaixo:
+
+Em um terminal rodar 500 requisições sequenciais
 
 ```
-$ time http :8081/hello id==2 duration==5100 retries==2
-HTTP/1.1 200
-Content-Type: application/json;charset=UTF-8
-Date: Mon, 30 Jul 2018 19:44:42 GMT
-Transfer-Encoding: chunked
-
-{
-    "calls": 0,
-    "id": 2
-}
-
-
-real	0m20.283s
-user	0m0.238s
-sys	0m0.012s
+for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
 ```
 
-Log do echo-server:
+Em outro terminal rodar 500 requisições sequenciais
 
 ```
-[0]: GET /echo?id=0,duration=5100,retries=0
-[0]: current: 0, retries: 0
-[0]: {0=1}
-[0]: Waiting for 5100 ms
-[1]: GET /echo?id=1,duration=5100,retries=1
-[1]: current: 0, retries: 1
-[1]: {0=1, 1=1}
-[1]: Waiting for 10200 ms
-[1]: GET /echo?id=1,duration=5100,retries=1
-[1]: current: 1, retries: 1
-[1]: {0=1, 1=2}
-[1]: Waiting for 5100 ms
-[2]: GET /echo?id=2,duration=5100,retries=2
-[2]: current: 0, retries: 2
-[2]: {0=1, 1=2, 2=1}
-[2]: Waiting for 10200 ms
-[2]: GET /echo?id=2,duration=5100,retries=2
-[2]: current: 1, retries: 2
-[2]: {0=1, 1=2, 2=2}
-[2]: Waiting for 10200 ms
+for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
 ```
 
-Verificar o Jaeger para ver os traces em http://localhost:16686/.
-
-### configuração
-
-Para os testes o timeout de uma requisição é 10000 ms e apenas 1 retry, seguindo a fórmula `timeoutInMilliseconds = ReadTimeout * MaxAutoRetries + ConnectTimeout`:
+### rodar com agente opentelemetry enviando para Jaeger:
 
 ```
-echo-server:
-  ribbon:
-    ReadTimeout: 10000
-    ConnectTimeout: 1000
-    MaxAutoRetries: 1
-    MaxAutoRetriesNextServer: 0
-    listOfServers: localhost:8080
-feign:
-  hystrix:
-    enabled: true
-hystrix:
-  command:
-    default:
-      execution:
-        isolation:
-          thread:
-            timeoutInMilliseconds: 21000
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.traces.exporter=jaeger \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=hello \
+  -jar hello/build/libs/hello-1.0.0.jar
+```
+
+```
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.traces.exporter=jaeger \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=echo-server,deployment.environment=production \
+  -jar echo-server/build/libs/echo-server-1.0.0.jar
 ```
