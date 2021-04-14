@@ -10,43 +10,29 @@ O serviço `hello` chama o serviço `echo-server` passando:
 
 O `duration` deve ser maior que a metade e menor que o total do timeout, assim habilita a regra para realizar o retry, pois são contabilizadas quantas vezes o mesmo id é chamado, se for igual ao número de retries retorna `duration`, senão retorna `duration * 2`
 
-### build
+## build
 
 ```sh
 ./gradlew build
 ```
 
-### baixar opentelemetry agent
+## baixar opentelemetry agent
 
 ```
 wget https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent-all.jar
 ```
 
-### baixar opentelemetry agent
+## baixar opentelemetry agent
 
 ```
 wget https://repo1.maven.org/maven2/co/elastic/apm/elastic-apm-agent/1.21.0/elastic-apm-agent-1.21.0.jar
 ```
 
-### rodar com agente opentelemetry enviando para ELK APM
-
-```
-java -javaagent:opentelemetry-javaagent-all.jar \
-  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
-  -Dotel.metrics.exporter=none \
-  -Dotel.resource.attributes=service.name=hello,deployment.environment=production \
-  -jar hello/build/libs/hello-1.0.0.jar
-```
-
-```
-java -javaagent:opentelemetry-javaagent-all.jar \
-  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
-  -Dotel.metrics.exporter=none \
-  -Dotel.resource.attributes=service.name=echo-server,deployment.environment=production \
-  -jar echo-server/build/libs/echo-server-1.0.0.jar
-```
+## rodar os testes
 
 ### rodar com agente ELK APM
+
+1) Em um terminal rodar:
 
 ```
 java -javaagent:./elastic-apm-agent-1.21.0.jar \
@@ -59,6 +45,8 @@ java -javaagent:./elastic-apm-agent-1.21.0.jar \
      -jar hello/build/libs/hello-1.0.0.jar
 ```
 
+2) Em outro terminal rodar:
+
 ```
 java -javaagent:./elastic-apm-agent-1.21.0.jar \
    -Delastic.apm.service_name=echo-server \
@@ -70,21 +58,67 @@ java -javaagent:./elastic-apm-agent-1.21.0.jar \
    -jar echo-server/build/libs/echo-server-1.0.0.jar
 ```
 
-### rodar testes usando https://httpie.org/:
-
-Para cada configuração acima rodar a bateria de testes abaixo:
-
-Em um terminal rodar 500 requisições sequenciais
+3) Em um terminal rodar 500 requisições sequenciais
 
 ```
 for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
 ```
 
-Em outro terminal rodar 500 requisições sequenciais
+4) Em outro terminal rodar 500 requisições sequenciais
 
 ```
 for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
 ```
+
+5) Encerrar a execução dos serviços, passos 1 e 2
+
+### rodar com agente opentelemetry enviando para ELK APM
+
+1) Em um terminal rodar:
+
+```
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=hello,deployment.environment=production \
+  -jar hello/build/libs/hello-1.0.0.jar
+```
+
+2) Em outro terminal rodar:
+
+```
+java -javaagent:opentelemetry-javaagent-all.jar \
+  -Dotel.exporter.otlp.endpoint=http://localhost:8200 \
+  -Dotel.metrics.exporter=none \
+  -Dotel.resource.attributes=service.name=echo-server,deployment.environment=production \
+  -jar echo-server/build/libs/echo-server-1.0.0.jar
+```
+
+3) Em um terminal rodar 500 requisições sequenciais
+
+```
+for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
+```
+
+4) Em outro terminal rodar 500 requisições sequenciais
+
+```
+for i in $(seq 0 500); do time http :8081/hello id==$i duration==0 retries==0; done
+```
+
+5) Encerrar a execução dos serviços, passos 1 e 2
+
+### resultados
+
+Na imagem abaixo podemos constatar: 
+
+![Resultados](elastic-apm.png "APM")
+
+- os tempos de latência das operações foram os mesmos
+
+- ao usar o agente da elastic o nome da transação não representa o path da requisição HTTP como com o agente do opentelemetry
+  - `HelloApp#echo` agente da elastic
+  - `/hello` agente do opentelemetry
 
 ### rodar com agente opentelemetry enviando para Jaeger:
 
